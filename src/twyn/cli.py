@@ -5,7 +5,6 @@ import click
 
 from twyn.__version__ import __version__
 from twyn.base.constants import (
-    DEPENDENCY_FILE_MAPPING,
     SELECTOR_METHOD_MAPPING,
     AvailableLoggingLevels,
 )
@@ -23,7 +22,7 @@ def entry_point() -> None:
 @click.option("--config", type=click.STRING)
 @click.option(
     "--dependency-file",
-    type=click.Choice(list(DEPENDENCY_FILE_MAPPING.keys())),
+    type=str,
     help=(
         "Dependency file to analyze. By default, twyn will search in the current directory "
         "for supported files, but this option will override that behavior."
