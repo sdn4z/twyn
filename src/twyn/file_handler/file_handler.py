@@ -1,10 +1,11 @@
+import json
 import logging
 import os
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 from twyn.base.exceptions import TwynError
-from twyn.file_handler.exceptions import PathIsNotFileError, PathNotFoundError
+from twyn.file_handler.exceptions import CannotCreateFileError, PathIsNotFileError, PathNotFoundError
 
 logger = logging.getLogger("twyn")
 
@@ -29,14 +30,22 @@ class FileHandler(BaseFileHandler):
         self._raise_for_file_exists()
 
         content = self.file_path.read_text()
-        logger.debug("Successfully read content from local dependencies file")
 
         return content
+
+    def read_json(self) -> dict[str, Any]:
+        self._raise_for_file_exists()
+        content = json.load(self.file_path.open())
+        return content
+
+    def write_json(self, content: dict[str, Any]) -> None:
+        self._raise_for_file_exists()
+        json.dump(content, self.file_path.open())
 
     def file_exists(self) -> bool:
         try:
             self._raise_for_file_exists()
-        except TwynError:
+        except (PathNotFoundError, PathIsNotFileError):
             return False
         return True
 
@@ -50,3 +59,10 @@ class FileHandler(BaseFileHandler):
     def write(self, data: str) -> None:
         self._raise_for_file_exists()
         self.file_path.write_text(data)
+
+    def create_if_does_not_exists(self) -> None:
+        if not self.file_exists():
+            try:
+                self.file_path.touch()
+            except Exception as e:
+                raise CannotCreateFileError from e

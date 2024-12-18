@@ -7,3 +7,7 @@ class PathIsNotFileError(TwynError):
 
 class PathNotFoundError(TwynError, FileNotFoundError):
     message = "Specified dependencies file path does not exist"
+
+
+class CannotCreateFileError(TwynError):
+    message = "Could not create the specified file"

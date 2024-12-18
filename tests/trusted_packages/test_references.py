@@ -67,7 +67,7 @@ class TestTopPyPiReference:
 
     @pytest.mark.parametrize("source", ["foo.com", "bar.com"])
     def test_can_use_different_pypi_sources(self, source):
-        top_pypi = TopPyPiReference(source=source)
+        top_pypi = TopPyPiReference(source=source, file_handler=Mock())
 
         with patch_pypi_requests_get(packages=["foo"]) as mock_get:
             top_pypi.get_packages()

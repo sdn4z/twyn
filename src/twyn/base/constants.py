@@ -26,6 +26,9 @@ DEFAULT_DEPENDENCY_FILE = "requirements.txt"
 DEFAULT_PROJECT_TOML_FILE = "pyproject.toml"
 DEFAULT_TOP_PYPI_PACKAGES = "https://hugovk.github.io/top-pypi-packages/top-pypi-packages-30-days.min.json"
 
+CACHE_DIR = ".twyn_cache"
+CACHE_FILE = CACHE_DIR + "dependencies"
+
 
 class AvailableLoggingLevels(enum.Enum):
     none = "NONE"

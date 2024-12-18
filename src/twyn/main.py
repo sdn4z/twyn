@@ -7,6 +7,7 @@ from rich.logging import RichHandler
 from rich.progress import track
 
 from twyn.base.constants import (
+    CACHE_FILE,
     DEFAULT_PROJECT_TOML_FILE,
     SELECTOR_METHOD_MAPPING,
     AvailableLoggingLevels,
@@ -45,7 +46,7 @@ def check_dependencies(
     _set_logging_level(config.logging_level)
 
     trusted_packages = TrustedPackages(
-        names=TopPyPiReference(source=config.pypi_reference).get_packages(),
+        names=TopPyPiReference(source=config.pypi_reference, file_handler=FileHandler(CACHE_FILE)).get_packages(),
         algorithm=EditDistance(),
         selector=get_candidate_selector(config.selector_method),
         threshold_class=SimilarityThreshold,
