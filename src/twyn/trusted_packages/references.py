@@ -37,8 +37,16 @@ class AbstractPackageReference(ABC):
 
         self.file_handler.create_if_does_not_exist()
 
+    @abstractmethod
+    def _parse(self) -> set[str]:  # TODO okay to have a ABC with just one abstratmethod?
+        """Parse trusted dependencies."""
+
     def get_packages(self) -> set[str]:
-        """Retrieve and parse online source. If cache is available, it will return it. It will write to it otherwise."""
+        """
+        Retrieve and parse online source.
+
+        If cache is available, it will return it. It will write to it otherwise.
+        """
         if cache := self._read_cache():
             return cache
 
@@ -67,7 +75,9 @@ class AbstractPackageReference(ABC):
         except (PathIsNotFileError, PathNotFoundError):
             logger.debug("Could not write to local cache file.")
 
-    def _download(self) -> dict[str, Any]:
+    def _download(
+        self,
+    ) -> dict[str, Any]:  # TODO evaluate: return dataclass, that's able to parse to the desired format
         packages = requests.get(self.source)
         packages.raise_for_status()
         try:
@@ -78,10 +88,6 @@ class AbstractPackageReference(ABC):
         logger.debug(f"Successfully downloaded trusted packages list from {self.source}")
 
         return packages_json
-
-    @abstractmethod
-    def _parse(self) -> set[str]:
-        """Parse trusted dependencies."""
 
 
 class TopPyPiReference(AbstractPackageReference):
