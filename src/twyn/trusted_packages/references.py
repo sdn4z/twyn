@@ -1,13 +1,11 @@
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass
-from datetime import datetime, timedelta
-from tkinter.tix import Tree
+from datetime import datetime
 from typing import Any, Optional
 
 import requests
 
-from twyn.base.exceptions import TwynError
 from twyn.file_handler.exceptions import PathIsNotFileError, PathNotFoundError
 from twyn.file_handler.file_handler import FileHandler
 from twyn.trusted_packages.exceptions import (
@@ -37,7 +35,7 @@ class AbstractPackageReference(ABC):
         self.source = source
         self.file_handler = file_handler
 
-        self.file_handler.create_if_does_not_exists()
+        self.file_handler.create_if_does_not_exist()
 
     def get_packages(self) -> set[str]:
         """Retrieve and parse online source. If cache is available, it will return it. It will write to it otherwise."""

@@ -4,7 +4,6 @@ import os
 from pathlib import Path
 from typing import Any, Protocol
 
-from twyn.base.exceptions import TwynError
 from twyn.file_handler.exceptions import CannotCreateFileError, PathIsNotFileError, PathNotFoundError
 
 logger = logging.getLogger("twyn")
@@ -60,7 +59,7 @@ class FileHandler(BaseFileHandler):
         self._raise_for_file_exists()
         self.file_path.write_text(data)
 
-    def create_if_does_not_exists(self) -> None:
+    def create_if_does_not_exist(self) -> None:
         if not self.file_exists():
             try:
                 self.file_path.touch()
