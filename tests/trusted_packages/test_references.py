@@ -7,6 +7,7 @@ import pytest
 import requests
 from freezegun import freeze_time
 from twyn.base.constants import DEFAULT_TOP_PYPI_PACKAGES
+from twyn.file_handler.file_handler import FileHandler
 from twyn.trusted_packages import TopPyPiReference
 from twyn.trusted_packages.cache_handler import CacheEntry, CacheHandler
 from twyn.trusted_packages.exceptions import (
@@ -43,6 +44,9 @@ class TestTopPyPiReference:
             pypi_ref = TopPyPiReference(source="pypi", cache_handler=cache_handler)
 
             retrieved_packages = pypi_ref.get_packages(use_cache=True)
+
+        # Cache has been created
+        assert cache_handler.exists()
 
         # The packages were downloaded and match the expected result
         assert m_pypi.call_count == 1
