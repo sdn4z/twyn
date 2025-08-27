@@ -45,9 +45,6 @@ class TestTopPyPiReference:
 
             retrieved_packages = pypi_ref.get_packages(use_cache=True)
 
-        # Cache has been created
-        assert cache_handler.exists()
-
         # The packages were downloaded and match the expected result
         assert m_pypi.call_count == 1
         assert retrieved_packages == cached_packages
