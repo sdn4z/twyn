@@ -53,7 +53,7 @@ jobs:
       - name: Build and push Docker image
         uses: ./.github/actions/docker-build
         with:
-          push-image: "true"
+          push: "true"
           platforms: linux/amd64,linux/arm64
           dockerfile: ./Dockerfile
           context: .
