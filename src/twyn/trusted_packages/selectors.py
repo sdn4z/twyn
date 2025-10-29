@@ -10,7 +10,7 @@ from twyn.trusted_packages.exceptions import CharacterNotInMatrixError
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from twyn.trusted_packages.trusted_packages import _PackageNames
+    from twyn.trusted_packages.managers.trusted_pypi_packages_manager import _PackageNames
 
 logger = logging.getLogger("twyn")
 

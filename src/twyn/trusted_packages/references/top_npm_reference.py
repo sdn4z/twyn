@@ -30,14 +30,14 @@ class TopNpmReference(AbstractPackageReference):
         package_pattern = re.compile(r"^[a-z0-9-~][a-z0-9-._~]*$")  # noqa: F821
         namespace_pattern = re.compile(r"^(?:@[a-z0-9-~][a-z0-9-._~]*)\/)?[a-z0-9-~][a-z0-9-._~]*$")  # noqa: F821
 
-        namespaces: dict[str, list[str]] = {}
+        namespaces: dict[str, set[str]] = {}
         packages_set = set()
         for package in packages:
             if namespace_pattern.match(package.lower()):
                 namespace, namespace_package = package.split("/")
                 if namespace not in namespaces:
-                    namespaces[namespace] = []
-                namespaces[namespace].append(namespace_package)
+                    namespaces[namespace] = set()
+                namespaces[namespace].add(namespace_package)
             elif package_pattern.match(package.lower()):
                 packages_set.add(package)
             else:

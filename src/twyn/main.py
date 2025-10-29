@@ -11,6 +11,7 @@ from twyn.config.config_handler import ConfigHandler, TwynConfiguration
 from twyn.config.exceptions import InvalidSelectorMethodError
 from twyn.dependency_managers.managers import (
     PACKAGE_ECOSYSTEMS,
+    DependencyManager,
     get_dependency_manager_from_file,
     get_dependency_manager_from_name,
 )
@@ -20,13 +21,14 @@ from twyn.file_handler.file_handler import FileHandler
 from twyn.similarity.algorithm import EditDistance, SimilarityThreshold
 from twyn.trusted_packages.cache_handler import CacheHandler
 from twyn.trusted_packages.exceptions import InvalidArgumentsError
+from twyn.trusted_packages.managers.base import TrustedPackagesProtocol
+from twyn.trusted_packages.managers.trusted_pypi_packages_manager import TrustedPackages
 from twyn.trusted_packages.models import (
     TyposquatCheckResultEntry,
     TyposquatCheckResultFromSource,
     TyposquatCheckResults,
 )
 from twyn.trusted_packages.references.base import AbstractPackageReference
-from twyn.trusted_packages.trusted_packages import TrustedPackages
 
 logger = logging.getLogger("twyn")
 logger.addHandler(logging.NullHandler())
@@ -176,34 +178,17 @@ def _analyze_packages_from_source(
         source = manager.get_alternative_source({"pypi": pypi_source, "npm": npm_source})
         top_package_reference = manager.trusted_packages_source(source, maybe_cache_handler)
 
-        normalized_packages = top_package_reference.get_packages()
-        trusted_packages = TrustedPackages(
-            names=normalized_packages.packages,
+        packages_from_source = top_package_reference.get_packages()
+        trusted_packages = dependency_manager.trusted_packages_manager(
+            names=packages_from_source,
             algorithm=EditDistance(),
             selector=selector_method,
             threshold_class=SimilarityThreshold,
         )
-        trusted_namespaces = (
-            TrustedPackages(
-                names=normalized_packages.namespaces,
-                algorithm=EditDistance(),
-                selector=selector_method,
-                threshold_class=SimilarityThreshold,
-            )
-            if normalized_packages.namespaces
-            else None
-        )
-
         results: list[TyposquatCheckResultFromSource] = []
         for parser in parsers:
             analyzed_dependencies = _analyze_dependencies(
-                top_package_reference,
-                trusted_packages,
-                parser.parse(),
-                allowlist,
-                show_progress_bar,
-                parser.file_path,
-                trusted_namespaces,
+                top_package_reference, trusted_packages, parser.parse(), allowlist, show_progress_bar, parser.file_path
             )
 
             if analyzed_dependencies:
@@ -217,12 +202,11 @@ def _analyze_packages_from_source(
 
 def _analyze_dependencies(
     top_package_reference: AbstractPackageReference,
-    trusted_packages: TrustedPackages,
+    trusted_packages: TrustedPackagesProtocol,
     packages: set[str],
     allowlist: set[str],
     show_progress_bar: bool,
     dependency_file: str | None = None,
-    trusted_namespaces: TrustedPackages | None = None,
 ) -> list[TyposquatCheckResultEntry]:
     """Analyze the set of given dependencies against the trusted packages' golden set.
 
@@ -238,17 +222,8 @@ def _analyze_dependencies(
             continue
 
         logger.info("Analyzing %s", dependency)
-
         if dependency not in trusted_packages and (typosquat_results := trusted_packages.get_typosquat(dependency)):
             errors.append(typosquat_results)
-        elif trusted_namespaces and dependency.startswith("@"):
-            namespace, package = dependency.split("/")
-            if namespace not in trusted_namespaces and (
-                typosquat_namespace_results := trusted_namespaces.get_typosquat(namespace)
-            ):
-                for maybe_namespace_typo in typosquat_namespace_results:
-                    if package in trusted_namespaces[maybe_namespace_typo]:
-                        errors.append(typosquat_results)
 
     return errors
 
