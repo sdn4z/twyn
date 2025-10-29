@@ -1,5 +1,6 @@
 import json
 import logging
+from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
@@ -10,6 +11,8 @@ from zoneinfo import ZoneInfo
 import click
 import httpx
 import stamina
+from pydantic import BaseModel
+from typing_extensions import Self, override
 
 logger = logging.getLogger("weekly_download")
 logging.basicConfig(
@@ -17,6 +20,54 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
+
+
+class BaseDataInterface(BaseModel, ABC):
+    packages: list[str]
+    date: str = datetime.now(ZoneInfo("UTC")).isoformat()
+
+    def __len__(self) -> int:
+        return len(self.packages)
+
+    @classmethod
+    @abstractmethod
+    def from_packages_list(cls, packages: list[str]) -> Self: ...
+
+
+class PypiDataInterface(BaseDataInterface):
+    @override
+    @classmethod
+    def from_packages_list(cls, packages: list[str]) -> Self:
+        return cls(packages=packages)
+
+
+class NpmDataInterface(BaseDataInterface):
+    @override
+    @classmethod
+    def from_packages_list(cls, packages: list[str]) -> Self:
+        return cls(packages=packages)
+
+
+class NpmFormattedDataInterface(BaseDataInterface):
+    packages: list[str]
+    namespaces: dict[str, list[str]]  # contains `namespace` as key, `packages` as strings in a list.
+
+    def __len__(self) -> int:
+        return len(self.packages) + sum([len(ns_packages) for _key, ns_packages in self.namespaces.items()])
+
+    @override
+    @classmethod
+    def from_packages_list(cls, packages: list[str]) -> Self:
+        namespaces: dict[str, list[str]] = {}
+        namespace_packages = []
+        for package in packages:
+            if package.startswith("@"):
+                namespace, package_name = package.split("/")
+                if namespace not in namespaces:
+                    namespaces[namespace] = []
+                namespaces[namespace].append(package_name)
+                namespace_packages.append(package)
+        return cls(packages=list(set(packages).difference(set(namespace_packages))), namespaces=namespaces)
 
 
 def parse_npm(data: list[dict[str, Any]]) -> list[str]:
@@ -37,6 +88,7 @@ class Ecosystem:
     params: dict[str, Any] | None
     pages: int | None
     parser: Callable[[dict[str, Any]], list[str]]
+    data_interface: type[BaseDataInterface]
 
 
 @dataclass(frozen=True)
@@ -45,17 +97,32 @@ class PypiEcosystem(Ecosystem):
     params = None
     pages = None
     parser = parse_pypi
+    data_interface = PypiDataInterface
 
 
 @dataclass(frozen=True)
 class NpmEcosystem(Ecosystem):
     url = "https://packages.ecosyste.ms/api/v1/registries/npmjs.org/packages"
-    params = {"per_page": 1000, "sort": "downloads"}
-    pages = 15
+    params = {"per_page": 100, "sort": "downloads"}
+    pages = 150
     parser = parse_npm
+    data_interface = NpmDataInterface
 
 
-ECOSYSTEMS = {"pypi": PypiEcosystem, "npm": NpmEcosystem}
+@dataclass(frozen=True)
+class NpmFormattedEcosystem(Ecosystem):
+    url = "https://packages.ecosyste.ms/api/v1/registries/npmjs.org/packages"
+    params = {"per_page": 100, "sort": "downloads"}
+    pages = 150
+    parser = parse_npm
+    data_interface = NpmFormattedDataInterface
+
+
+ECOSYSTEMS: dict[str, type[Ecosystem]] = {
+    "pypi": PypiEcosystem,
+    "npm": NpmEcosystem,
+    "npm_formatted": NpmFormattedEcosystem,
+}
 
 
 @click.group()
@@ -72,20 +139,23 @@ def entry_point() -> None:
 def download(
     ecosystem: str,
 ) -> None:
+    if ecosystem not in ECOSYSTEMS:
+        raise click.BadParameter("Not a valid ecosystem")
+
     selected_ecosystem = ECOSYSTEMS[ecosystem]
+    n_pages = selected_ecosystem.pages or 1
+    all_packages: list[str] = []
 
-    if pages := selected_ecosystem.pages:
-        all_packages: list[str] = []
-
-        for page in range(1, pages + 1):
-            params = selected_ecosystem.params or {}
+    for page in range(150, n_pages + 1 + 150):
+        params = selected_ecosystem.params or {}
+        if selected_ecosystem.pages:
             params["page"] = page
-            all_packages.extend(get_packages(selected_ecosystem.url, selected_ecosystem.parser, params))
-    else:
-        all_packages = get_packages(selected_ecosystem.url, selected_ecosystem.parser, selected_ecosystem.params)
+
+        all_packages.extend(get_packages(selected_ecosystem.url, selected_ecosystem.parser, params))
 
     fpath = Path("dependencies") / f"{ecosystem}.json"
-    save_data_to_file(all_packages, fpath)
+    data = selected_ecosystem.data_interface.from_packages_list(all_packages)
+    save_data_to_file(data, fpath)
 
 
 def get_packages(
@@ -93,12 +163,12 @@ def get_packages(
 ) -> list[str]:
     for attempt in stamina.retry_context(
         on=(httpx.TransportError, httpx.TimeoutException, ServerError),
-        attempts=5,
+        attempts=10,
         wait_jitter=1,
         wait_exp_base=2,
         wait_max=8,
     ):
-        with attempt, httpx.Client(timeout=30) as client:
+        with attempt, httpx.Client(timeout=90) as client:
             response = client.get(str(base_url), params=params)
             try:
                 response.raise_for_status()
@@ -108,12 +178,14 @@ def get_packages(
     return parser(response.json())
 
 
-def save_data_to_file(all_packages: list[str], fpath: Path) -> None:
-    data = {"date": datetime.now(ZoneInfo("UTC")).isoformat(), "packages": all_packages}
+def save_data_to_file(
+    data: BaseDataInterface,
+    fpath: Path,
+) -> None:
     with open(str(fpath), "w") as fp:
-        json.dump(data, fp)
+        json.dump(data.model_dump(), fp)
 
-    logger.info("Saved %d packages to `%s` file.", len(set(all_packages)), fpath)
+    logger.info("Saved %d packages to `%s` file.", len(data), fpath)
 
 
 if __name__ == "__main__":

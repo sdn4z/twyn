@@ -16,8 +16,12 @@ logger = logging.getLogger("twyn")
 class CacheEntry(BaseModel):
     saved_date: str
     """ISO format date string when the cache entry was saved."""
+
     packages: set[str]
     """Set of trusted package names."""
+
+    namespaces: dict[str, list[str]] | None = None
+    """Dictionary containing all the namespaces and the packages."""
 
     @field_validator("saved_date")
     @classmethod

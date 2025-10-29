@@ -1,5 +1,6 @@
 import logging
 from abc import abstractmethod
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
@@ -12,6 +13,12 @@ from twyn.trusted_packages.exceptions import (
 )
 
 logger = logging.getLogger("twyn")
+
+
+@dataclass
+class NormalizedPackages:
+    packages: set[str]
+    namespaces: dict[str, list[str]] | None = None
 
 
 class AbstractPackageReference:
@@ -32,7 +39,7 @@ class AbstractPackageReference:
 
     @staticmethod
     @abstractmethod
-    def normalize_packages(packages: set[str]) -> set[str]:
+    def normalize_packages(packages: set[str]) -> NormalizedPackages:
         """Normalize package names to make sure they're valid within the package manager context."""
 
     def _download(self) -> dict[str, Any]:
@@ -45,11 +52,13 @@ class AbstractPackageReference:
         except requests.exceptions.JSONDecodeError as err:
             raise InvalidJSONError from err
 
-    def _save_trusted_packages_to_cache_if_enabled(self, packages: set[str]) -> None:
+    def _save_trusted_packages_to_cache_if_enabled(
+        self, packages: set[str], namespaces: dict[str, list[str]] | None = None
+    ) -> None:
         """Save trusted packages using CacheHandler."""
         if not self.cache_handler:
             return
-        cache_entry = CacheEntry(saved_date=datetime.now().date().isoformat(), packages=packages)
+        cache_entry = CacheEntry(saved_date=datetime.now().date().isoformat(), packages=packages, namespaces=namespaces)
         self.cache_handler.write_entry(self.source, cache_entry)
         logger.debug("Saved %d trusted packages for source %s", len(packages), self.source)
 
@@ -64,7 +73,7 @@ class AbstractPackageReference:
 
         return cache_entry.packages
 
-    def get_packages(self) -> set[str]:
+    def get_packages(self) -> NormalizedPackages:
         """Download and parse online source of top packages from the package ecosystem."""
         packages = self._get_packages_from_cache_if_enabled()
         # we don't save the cache here, we keep it as it is so the date remains the original one.
@@ -74,6 +83,7 @@ class AbstractPackageReference:
             data = self._download()
             try:
                 packages = set(data["packages"])
+                namespaces = data.get("namespaces")
             except KeyError as err:
                 raise InvalidJSONError("`packages` key not in JSON.") from err
 
@@ -82,7 +92,6 @@ class AbstractPackageReference:
                 raise EmptyPackagesListError
 
             # New packages were downloaded, we create a new entry updating all values.
-            self._save_trusted_packages_to_cache_if_enabled(packages)
+            self._save_trusted_packages_to_cache_if_enabled(packages, namespaces)
 
-        normalized_packages = self.normalize_packages(packages)
-        return normalized_packages
+        return self.normalize_packages(packages)

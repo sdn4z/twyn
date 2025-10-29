@@ -6,7 +6,7 @@ from typing_extensions import override
 from twyn.trusted_packages.exceptions import (
     PackageNormalizingError,
 )
-from twyn.trusted_packages.references.base import AbstractPackageReference
+from twyn.trusted_packages.references.base import AbstractPackageReference, NormalizedPackages
 
 logger = logging.getLogger("twyn")
 
@@ -21,7 +21,7 @@ class TopPyPiReference(AbstractPackageReference):
 
     @override
     @staticmethod
-    def normalize_packages(packages: set[str]) -> set[str]:
+    def normalize_packages(packages: set[str]) -> NormalizedPackages:
         """Normalize dependency names according to PyPi https://packaging.python.org/en/latest/specifications/name-normalization/."""
         if not packages:
             logger.debug("Tried to normalize packages, but none were provided")
@@ -33,4 +33,4 @@ class TopPyPiReference(AbstractPackageReference):
             if not pattern.match(package):
                 raise PackageNormalizingError(f"Package name '{package}' does not match required pattern")
 
-        return renamed_packages
+        return NormalizedPackages(packages=renamed_packages, namespaces={})

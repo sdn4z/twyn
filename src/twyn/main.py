@@ -176,17 +176,34 @@ def _analyze_packages_from_source(
         source = manager.get_alternative_source({"pypi": pypi_source, "npm": npm_source})
         top_package_reference = manager.trusted_packages_source(source, maybe_cache_handler)
 
-        packages_from_source = top_package_reference.get_packages()
+        normalized_packages = top_package_reference.get_packages()
         trusted_packages = TrustedPackages(
-            names=packages_from_source,
+            names=normalized_packages.packages,
             algorithm=EditDistance(),
             selector=selector_method,
             threshold_class=SimilarityThreshold,
         )
+        trusted_namespaces = (
+            TrustedPackages(
+                names=normalized_packages.namespaces,
+                algorithm=EditDistance(),
+                selector=selector_method,
+                threshold_class=SimilarityThreshold,
+            )
+            if normalized_packages.namespaces
+            else None
+        )
+
         results: list[TyposquatCheckResultFromSource] = []
         for parser in parsers:
             analyzed_dependencies = _analyze_dependencies(
-                top_package_reference, trusted_packages, parser.parse(), allowlist, show_progress_bar, parser.file_path
+                top_package_reference,
+                trusted_packages,
+                parser.parse(),
+                allowlist,
+                show_progress_bar,
+                parser.file_path,
+                trusted_namespaces,
             )
 
             if analyzed_dependencies:
@@ -205,6 +222,7 @@ def _analyze_dependencies(
     allowlist: set[str],
     show_progress_bar: bool,
     dependency_file: str | None = None,
+    trusted_namespaces: TrustedPackages | None = None,
 ) -> list[TyposquatCheckResultEntry]:
     """Analyze the set of given dependencies against the trusted packages' golden set.
 
@@ -220,8 +238,17 @@ def _analyze_dependencies(
             continue
 
         logger.info("Analyzing %s", dependency)
+
         if dependency not in trusted_packages and (typosquat_results := trusted_packages.get_typosquat(dependency)):
             errors.append(typosquat_results)
+        elif trusted_namespaces and dependency.startswith("@"):
+            namespace, package = dependency.split("/")
+            if namespace not in trusted_namespaces and (
+                typosquat_namespace_results := trusted_namespaces.get_typosquat(namespace)
+            ):
+                for maybe_namespace_typo in typosquat_namespace_results:
+                    if package in trusted_namespaces[maybe_namespace_typo]:
+                        errors.append(typosquat_results)
 
     return errors
 
