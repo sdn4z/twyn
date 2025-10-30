@@ -97,7 +97,7 @@ class TrustedNpmPackageManager:
         considered similar to another one. The algorithm provided and the threshold
         are used to determine if the package name can be considered similar.
         """
-        dependency = NamespaceDependency.from_name(package_name)  # TODO no me gusta
+        dependency = NamespaceDependency.from_name(package_name)
         if dependency.namespace:
             return self._get_typosquats_from_namespace_dependency(dependency)
         return self._get_typosquats_from_dependency(dependency)

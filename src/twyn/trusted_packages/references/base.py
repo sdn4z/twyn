@@ -66,7 +66,7 @@ class AbstractPackageReference:
 
     @staticmethod
     @abstractmethod
-    def normalize_packages(packages: set[str]) -> NormalizedPackages:
+    def normalize_packages(packages: set[str], namespaces: dict[str, list[str]] | None = None) -> NormalizedPackages:
         """Normalize package names to make sure they're valid within the package manager context."""
 
     def _download(self) -> dict[str, Any]:
@@ -110,7 +110,6 @@ class AbstractPackageReference:
             data = self._download()
             try:
                 packages = set(data["packages"])
-                namespaces = data.get("namespaces")
             except KeyError as err:
                 raise InvalidJSONError("`packages` key not in JSON.") from err
 
@@ -118,7 +117,17 @@ class AbstractPackageReference:
             if not packages:
                 raise EmptyPackagesListError
 
-            # New packages were downloaded, we create a new entry updating all values.
-            self._save_trusted_packages_to_cache_if_enabled(packages, namespaces)
+            # Normalize packages to extract namespaces for caching
+            normalized = self.normalize_packages(packages)
 
-        return self.normalize_packages(packages)
+            # Convert namespaces from sets to lists for JSON serialization
+            namespaces_for_cache = {}
+            if normalized.namespaces:
+                namespaces_for_cache = {ns: sorted(pkgs) for ns, pkgs in normalized.namespaces.items()}
+
+            # New packages were downloaded, we create a new entry updating all values.
+            self._save_trusted_packages_to_cache_if_enabled(packages, namespaces_for_cache)
+
+            return normalized
+
+        return self.normalize_packages(packages, namespaces)

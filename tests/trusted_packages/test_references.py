@@ -124,6 +124,8 @@ class TestAbstractPackageReference:
 
         assert set(cache_content.packages) == set(cached_packages)
         assert cache_content.saved_date == "2025-08-21"
+        # PyPI doesn't use namespaces, so should be empty dict
+        assert cache_content.namespaces == {}
 
     @patch("requests.get")
     def test__download_json_exception(self, mock_get: Mock) -> None:
@@ -222,16 +224,80 @@ class TestTopPyPiReference:
 
 class TestTopNpmReference:
     def test_get_trusted_packages(self, tmp_path: Path) -> None:
+        """Test downloading packages and verify both packages and namespaces are saved to cache."""
         test_packages = ["foo", "bar", "react", "express", "lodash", "@aws/sdk"]
 
+        cache_handler = CacheHandler(str(tmp_path / "cache"))
         with patch_npm_packages_download(test_packages) as m_npm:
-            ref = TopNpmReference(cache_handler=CacheHandler(str(tmp_path / "cache")))
+            ref = TopNpmReference(cache_handler=cache_handler)
             packages = ref.get_packages()
 
+        # Verify packages were downloaded
         assert set(packages) == {"foo", "bar", "react", "express", "lodash", "@aws/sdk"}
         assert m_npm.call_count == 1
+
+        # Verify cache entry was created with namespaces
+        cache_entry = cache_handler.get_cache_entry(ref.source)
+        assert cache_entry is not None
+        assert cache_entry.packages == {"foo", "bar", "react", "express", "lodash", "@aws/sdk"}
+        assert cache_entry.namespaces == {"@aws": ["sdk"]}  # Only @aws/sdk has namespace
 
     def test_normalize_package_invalid_name_raises(self) -> None:
         ref = TopNpmReference()
         with pytest.raises(PackageNormalizingError):
             ref.normalize_packages({"INVALID PACKAGE NAME!"})
+
+    @freeze_time("2025-8-21", tz_offset=0)
+    def test_cache_is_saved_when_not_existing_with_namespaces(self, tmp_path: Path) -> None:
+        """Test that cache with namespaces gets saved correctly when starting from empty."""
+        cached_packages = ["express", "@aws/sdk", "@types/node"]
+        cache_handler = CacheHandler(str(tmp_path / "cache"))
+        with patch_npm_packages_download(cached_packages) as m_npm:
+            npm_ref = TopNpmReference(source="npm", cache_handler=cache_handler)
+
+            retrieved_packages = npm_ref.get_packages()
+
+        # The packages were downloaded and match the expected result
+        assert m_npm.call_count == 1
+        assert set(retrieved_packages) == set(cached_packages)
+
+        # The packages were saved to the cache file, with namespaces extracted
+        cache_content = cache_handler.get_cache_entry("npm")
+
+        assert set(cache_content.packages) == set(cached_packages)
+        assert cache_content.saved_date == "2025-08-21"
+        # Verify namespaces were extracted and saved
+        expected_namespaces = {"@aws": ["sdk"], "@types": ["node"]}
+        assert cache_content.namespaces == expected_namespaces
+
+    @freeze_time("2025-8-19")
+    def test_get_trusted_packages_uses_valid_cache_with_namespaces(self, tmp_path: Path) -> None:
+        """Test that namespaces are properly retrieved from cache and no download occurs."""
+        test_packages = ["react", "vue", "@angular/core", "@nestjs/common"]
+        test_namespaces = {"@angular": ["core"], "@nestjs": ["common"]}
+
+        cache_handler = CacheHandler(str(tmp_path / "cache"))
+
+        # Pre-populate cache with packages and namespaces
+        cache_entry = CacheEntry(
+            saved_date="2025-08-18",  # Yesterday, so still valid
+            packages=test_packages,
+            namespaces=test_namespaces,
+        )
+        cache_handler.write_entry("npm_test_source", cache_entry)
+
+        # Create reference with the same source
+        with patch_npm_packages_download([]) as m_npm:
+            ref = TopNpmReference(source="npm_test_source", cache_handler=cache_handler)
+            packages = ref.get_packages()
+
+        # Verify no download occurred (cache was used)
+        assert m_npm.call_count == 0
+
+        # Verify packages include both regular packages and namespaced ones
+        assert set(packages) == {"react", "vue", "@angular/core", "@nestjs/common"}
+
+        # Verify the normalized packages contain proper namespaces
+        assert packages.namespaces is not None
+        expected_namespaces_sets = {"@angular": {"core"}, "@nestjs": {"common"}}
+        assert packages.namespaces == expected_namespaces_sets
