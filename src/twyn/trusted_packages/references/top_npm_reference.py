@@ -28,7 +28,7 @@ class TopNpmReference(AbstractPackageReference):
             return NormalizedPackages(packages=set())
 
         package_pattern = re.compile(r"^[a-z0-9-~][a-z0-9-._~]*$")  # noqa: F821
-        namespace_pattern = re.compile(r"^(?:@[a-z0-9-~][a-z0-9-._~]*)\/)?[a-z0-9-~][a-z0-9-._~]*$")  # noqa: F821
+        namespace_pattern = re.compile(r"^(?:@[a-z0-9-~][a-z0-9-._~]*)\/[a-z0-9-~][a-z0-9-._~]*$")  # noqa: F821
 
         namespaces: dict[str, set[str]] = {}
         packages_set = set()

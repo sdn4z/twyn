@@ -56,5 +56,5 @@ class AllSimilar(AbstractSelector):
 
     def select_similar_names(self, names: _PackageNames, name: str) -> Iterable[str]:
         """Return all available package names as candidates."""
-        for candidates in names.values():
-            yield from candidates
+        for candidates in names:
+            yield from names[candidates]

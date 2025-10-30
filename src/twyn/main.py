@@ -179,7 +179,7 @@ def _analyze_packages_from_source(
         top_package_reference = manager.trusted_packages_source(source, maybe_cache_handler)
 
         packages_from_source = top_package_reference.get_packages()
-        trusted_packages = dependency_manager.trusted_packages_manager(
+        trusted_packages = manager.trusted_packages_manager(
             names=packages_from_source,
             algorithm=EditDistance(),
             selector=selector_method,

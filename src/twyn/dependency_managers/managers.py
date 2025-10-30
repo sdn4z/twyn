@@ -9,12 +9,9 @@ from twyn.dependency_parser.parsers.constants import (
     UV_LOCK,
     YARN_LOCK,
 )
-<<<<<<< HEAD
-=======
 from twyn.trusted_packages.managers.base import TrustedPackagesProtocol
 from twyn.trusted_packages.managers.trusted_npm_packages_manager import TrustedNpmPackageManager
 from twyn.trusted_packages.managers.trusted_pypi_packages_manager import TrustedPackages
->>>>>>> d3c72c7 (wip)
 from twyn.trusted_packages.references.base import AbstractPackageReference
 from twyn.trusted_packages.references.top_npm_reference import TopNpmReference
 from twyn.trusted_packages.references.top_pypi_reference import TopPyPiReference

@@ -25,7 +25,7 @@ class TopPyPiReference(AbstractPackageReference):
         """Normalize dependency names according to PyPi https://packaging.python.org/en/latest/specifications/name-normalization/."""
         if not packages:
             logger.debug("Tried to normalize packages, but none were provided")
-            return set()
+            return NormalizedPackages(packages=set())
         renamed_packages = {re.sub(r"[-_.]+", "-", name).lower() for name in packages}
 
         pattern = re.compile(r"^([a-z0-9]|[a-z0-9][a-z0-9._-]*[a-z0-9])\Z")  # noqa: F821
@@ -33,4 +33,4 @@ class TopPyPiReference(AbstractPackageReference):
             if not pattern.match(package):
                 raise PackageNormalizingError(f"Package name '{package}' does not match required pattern")
 
-        return NormalizedPackages(packages=renamed_packages, namespaces={})
+        return NormalizedPackages(packages=renamed_packages)

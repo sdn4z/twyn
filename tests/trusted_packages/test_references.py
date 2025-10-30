@@ -13,7 +13,7 @@ from twyn.trusted_packages.exceptions import (
     InvalidJSONError,
     PackageNormalizingError,
 )
-from twyn.trusted_packages.references.base import AbstractPackageReference
+from twyn.trusted_packages.references.base import AbstractPackageReference, NormalizedPackages
 
 from tests.conftest import patch_npm_packages_download, patch_pypi_packages_download
 
@@ -22,14 +22,12 @@ class TestAbstractPackageReference:
     class DummyPackageReference(AbstractPackageReference):
         """Returns always the same packages, used for testing the interface."""
 
-        def get_packages(self) -> set[str]:
-            return {"foo", "bar"}
+        def get_packages(self) -> NormalizedPackages:
+            return NormalizedPackages(packages={"foo", "bar"})
 
     def test_get_packages(self) -> None:
-        assert self.DummyPackageReference(source="foo", cache_handler=CacheHandler()).get_packages() == {
-            "foo",
-            "bar",
-        }
+        result = self.DummyPackageReference(source="foo", cache_handler=CacheHandler()).get_packages()
+        assert set(result) == {"foo", "bar"}
 
     @freeze_time("2025-8-19")
     def test_get_trusted_packages_uses_valid_cache(self, tmp_path: Path) -> None:
@@ -50,7 +48,7 @@ class TestAbstractPackageReference:
             result = TopPyPiReference("pypi", cache_handler=cache_handler).get_packages()
 
         assert m_pypi.call_count == 0
-        assert result == {"flask", "fastapi", "requests", "django"}
+        assert set(result) == {"flask", "fastapi", "requests", "django"}
 
     def test_get_packages_no_cache(self) -> None:
         """Test that when use_cache is False, cache is not read or written, and packages are retrieved."""
@@ -105,7 +103,7 @@ class TestAbstractPackageReference:
 
         # Should download from source due to invalid package names in cache
         assert mock_pypi.call_count == 1
-        assert result == {"valid-package", "another-valid", "third-valid"}
+        assert set(result) == {"valid-package", "another-valid", "third-valid"}
 
     @freeze_time("2025-8-21", tz_offset=0)
     def test_cache_is_saved_when_not_existing(self, tmp_path: Path) -> None:
@@ -119,7 +117,7 @@ class TestAbstractPackageReference:
 
         # The packages were downloaded and match the expected result
         assert m_pypi.call_count == 1
-        assert retrieved_packages == set(cached_packages)
+        assert set(retrieved_packages) == set(cached_packages)
 
         # The packages were saved to the cache file, with its associated metadata
         cache_content = cache_handler.get_cache_entry("pypi")
@@ -167,7 +165,7 @@ class TestTopPyPiReference:
             ref = TopPyPiReference(cache_handler=CacheHandler(str(tmp_path / "cache")))
             packages = ref.get_packages()
 
-        assert packages == {"foo", "bar", "django", "requests", "sqlalchemy"}
+        assert set(packages) == {"foo", "bar", "django", "requests", "sqlalchemy"}
         assert m_pypi.call_count == 1
 
     @pytest.mark.parametrize(
@@ -183,13 +181,13 @@ class TestTopPyPiReference:
     def test_normalize_package_when_loaded_from_cache(
         self, mock_get_packages_from_cache: Mock, package_name: Mock, tmp_path: Path
     ) -> None:
-        mock_get_packages_from_cache.return_value = {package_name}
+        mock_get_packages_from_cache.return_value = ({package_name}, None)
 
         with patch_pypi_packages_download([]) as m_pypi:
             ref = TopPyPiReference(cache_handler=CacheHandler(str(tmp_path / "cache")))
             packages = ref.get_packages()
 
-        assert packages == {"my-package"}
+        assert set(packages) == {"my-package"}
         assert m_pypi.call_count == 0
         assert mock_get_packages_from_cache.call_count == 1
 
@@ -206,17 +204,17 @@ class TestTopPyPiReference:
     def test_normalize_package_when_downloaded(
         self, mock_get_packages_from_cache: Mock, package_name: Mock, tmp_path: Path
     ) -> None:
-        mock_get_packages_from_cache.return_value = {}
+        mock_get_packages_from_cache.return_value = (set(), None)
 
         with patch_pypi_packages_download([package_name]) as m_pypi:
             ref = TopPyPiReference()
             packages = ref.get_packages()
 
-        assert packages == {"my-package"}
+        assert set(packages) == {"my-package"}
         assert m_pypi.call_count == 1
         assert mock_get_packages_from_cache.call_count == 1
 
-    def test_normalize_package_invalid_name_raises(self):
+    def test_normalize_package_invalid_name_raises(self) -> None:
         ref = TopPyPiReference()
         with pytest.raises(PackageNormalizingError):
             ref.normalize_packages({"INVALID PACKAGE NAME!"})
@@ -224,16 +222,16 @@ class TestTopPyPiReference:
 
 class TestTopNpmReference:
     def test_get_trusted_packages(self, tmp_path: Path) -> None:
-        test_packages = ["foo", "bar", "react", "express", "lodash"]
+        test_packages = ["foo", "bar", "react", "express", "lodash", "@aws/sdk"]
 
         with patch_npm_packages_download(test_packages) as m_npm:
             ref = TopNpmReference(cache_handler=CacheHandler(str(tmp_path / "cache")))
             packages = ref.get_packages()
 
-        assert packages == {"foo", "bar", "react", "express", "lodash"}
+        assert set(packages) == {"foo", "bar", "react", "express", "lodash", "@aws/sdk"}
         assert m_npm.call_count == 1
 
-    def test_normalize_package_invalid_name_raises(self):
+    def test_normalize_package_invalid_name_raises(self) -> None:
         ref = TopNpmReference()
         with pytest.raises(PackageNormalizingError):
             ref.normalize_packages({"INVALID PACKAGE NAME!"})

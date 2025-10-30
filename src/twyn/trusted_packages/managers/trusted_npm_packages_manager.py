@@ -29,7 +29,7 @@ class NamespaceDependency:
         if name.startswith("@"):
             namespace, package = name.split("/")
             return cls(package=package, namespace=namespace)
-        return cls(package=package)
+        return cls(package=name)
 
 
 class TrustedNpmPackageManager:
@@ -42,7 +42,7 @@ class TrustedNpmPackageManager:
         selector: AbstractSelector,
         threshold_class: type[SimilarityThreshold],
     ) -> None:
-        self.namespaces, self.packages = self._create_names_dictionary(names)
+        self.packages, self.namespaces = self._create_names_dictionary(names)
 
         self.threshold_class = threshold_class
         self.selector = selector

@@ -259,7 +259,7 @@ class TestCheckDependencies:
     def test_check_dependencies_with_input_from_cli_detects_typosquats(
         self, mock_get_packages_from_cache: Mock
     ) -> None:
-        mock_get_packages_from_cache.return_value = {"mypackage"}
+        mock_get_packages_from_cache.return_value = ({"mypackage"}, None)
         error = check_dependencies(
             dependencies={"my-package"},
             package_ecosystem="pypi",
@@ -279,7 +279,7 @@ class TestCheckDependencies:
         self, mock_get_packages_from_cache: Mock, uv_lock_file_with_typo: Path
     ) -> None:
         """Test that recursive and dependency file can be set at the same time, and then dependency file takes precedence while recurisve is ignored."""
-        mock_get_packages_from_cache.return_value = {"requests"}
+        mock_get_packages_from_cache.return_value = ({"requests"}, None)
         error = check_dependencies(
             dependency_files={str(uv_lock_file_with_typo)},
             package_ecosystem="pypi",
@@ -298,7 +298,7 @@ class TestCheckDependencies:
     def test_check_dependencies_with_input_loads_file_from_different_location(
         self, mock_get_packages_from_cache: Mock, tmp_path: Path
     ) -> None:
-        mock_get_packages_from_cache.return_value = {"mypackage"}
+        mock_get_packages_from_cache.return_value = ({"mypackage"}, None)
         tmp_file = tmp_path / "fake-dir" / "requirements.txt"
         with create_tmp_file(tmp_file, "mypackag"):
             error = check_dependencies(
@@ -321,7 +321,7 @@ class TestCheckDependencies:
     def test_check_dependencies_with_multiple_dependency_files(
         self, mock_get_packages_from_cache: Mock, tmp_path: Path, uv_lock_file_with_typo: Path
     ) -> None:
-        mock_get_packages_from_cache.return_value = {"requests"}
+        mock_get_packages_from_cache.return_value = ({"requests"}, None)
         tmp_file = tmp_path / "fake-dir" / "requirements.txt"
         with create_tmp_file(tmp_file, "reqests"):
             error = check_dependencies(
@@ -347,7 +347,7 @@ class TestCheckDependencies:
     def test_check_dependencies_with_input_from_cli_accepts_multiple_dependencies(
         self, mock_get_packages_from_cache: Mock
     ) -> None:
-        mock_get_packages_from_cache.return_value = {"requests", "mypackage"}
+        mock_get_packages_from_cache.return_value = ({"requests", "mypackage"}, None)
 
         error = check_dependencies(
             config_file=None,
@@ -378,7 +378,7 @@ class TestCheckDependencies:
 
     @patch("twyn.trusted_packages.TopPyPiReference._get_packages_from_cache_if_enabled")
     def test_check_dependencies_with_input_from_cli_no_results(self, mock_get_packages_from_cache: Mock) -> None:
-        mock_get_packages_from_cache.return_value = {"requests"}
+        mock_get_packages_from_cache.return_value = ({"requests"}, None)
 
         error = check_dependencies(
             config_file=None,
@@ -394,7 +394,7 @@ class TestCheckDependencies:
     def test_error_when_show_progress_bar_and_dependencies_not_installed(
         self, mock_get_packages_from_cache: Mock
     ) -> None:
-        mock_get_packages_from_cache.return_value = {"requests"}
+        mock_get_packages_from_cache.return_value = ({"requests"}, None)
         sys.modules.pop("rich.progress", None)
         sys.modules.pop("rich", None)
 
@@ -413,7 +413,7 @@ class TestCheckDependencies:
     ) -> None:
         mock_exc.side_effect = Exception()
 
-        mock_get_packages_from_cache.return_value = {"requests"}
+        mock_get_packages_from_cache.return_value = ({"requests"}, None)
         sys.modules.pop("rich.progress", None)
         sys.modules.pop("rich", None)
 
