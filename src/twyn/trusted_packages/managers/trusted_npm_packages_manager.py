@@ -1,8 +1,5 @@
 from collections import defaultdict
-from dataclasses import dataclass
 from typing import Any
-
-from typing_extensions import Self
 
 from twyn.similarity.algorithm import (
     AbstractSimilarityAlgorithm,
@@ -49,16 +46,19 @@ class TrustedNpmPackageManager:
                 first_letter_names[name[0]].add(name)
         return first_letter_names, namespaces
 
-    def _get_typosquats_from_namespace_dependency(self, package_name: str) -> Any:
+    def _get_typosquats_from_namespace_dependency(self, package_name: str) -> TyposquatCheckResultEntry:
         namespace, dependency = package_name.split("/")
         threshold = self.threshold_class.from_name(namespace)
         typosquat_result = TyposquatCheckResultEntry(dependency=package_name)
-        for trusted_namespace_name in self.selector.select_similar_names(names=self.namespaces.keys(), name=namespace):
+        for trusted_namespace_name in self.selector.select_similar_names(
+            names={"@": self.namespaces.keys()}, name=namespace
+        ):
             distance = self.algorithm.get_distance(namespace, trusted_namespace_name)
             if threshold.is_inside_threshold(distance) and dependency in self.namespaces[trusted_namespace_name]:
-                typosquat_result.add(trusted_namespace_name)
+                typosquat_result.add(f"{trusted_namespace_name}/{dependency}")
+        return typosquat_result
 
-    def _get_typosquats_from_dependency(self, package_name: str) -> Any:
+    def _get_typosquats_from_dependency(self, package_name: str) -> TyposquatCheckResultEntry:
         threshold = self.threshold_class.from_name(package_name)
         typosquat_result = TyposquatCheckResultEntry(dependency=package_name)
         for trusted_package_name in self.selector.select_similar_names(names=self.packages, name=package_name):
@@ -75,5 +75,5 @@ class TrustedNpmPackageManager:
         are used to determine if the package name can be considered similar.
         """
         if package_name.startswith("@"):
-            self._get_typosquats_from_namespace_dependency(package_name)
+            return self._get_typosquats_from_namespace_dependency(package_name)
         return self._get_typosquats_from_dependency(package_name)

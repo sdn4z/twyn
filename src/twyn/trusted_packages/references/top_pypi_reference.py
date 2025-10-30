@@ -21,7 +21,7 @@ class TopPyPiReference(AbstractPackageReference):
 
     @override
     @staticmethod
-    def normalize_packages(packages: set[str], namespaces: dict[str, list[str]] | None = None) -> NormalizedPackages:
+    def normalize_packages(packages: set[str]) -> NormalizedPackages:
         """Normalize dependency names according to PyPi https://packaging.python.org/en/latest/specifications/name-normalization/."""
         if not packages:
             logger.debug("Tried to normalize packages, but none were provided")

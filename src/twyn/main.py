@@ -11,7 +11,6 @@ from twyn.config.config_handler import ConfigHandler, TwynConfiguration
 from twyn.config.exceptions import InvalidSelectorMethodError
 from twyn.dependency_managers.managers import (
     PACKAGE_ECOSYSTEMS,
-    DependencyManager,
     get_dependency_manager_from_file,
     get_dependency_manager_from_name,
 )
@@ -22,7 +21,6 @@ from twyn.similarity.algorithm import EditDistance, SimilarityThreshold
 from twyn.trusted_packages.cache_handler import CacheHandler
 from twyn.trusted_packages.exceptions import InvalidArgumentsError
 from twyn.trusted_packages.managers.base import TrustedPackagesProtocol
-from twyn.trusted_packages.managers.trusted_pypi_packages_manager import TrustedPackages
 from twyn.trusted_packages.models import (
     TyposquatCheckResultEntry,
     TyposquatCheckResultFromSource,
@@ -136,7 +134,7 @@ def _analyze_dependencies_from_input(
     dependency_manager = get_dependency_manager_from_name(package_ecosystem)
     source = dependency_manager.get_alternative_source({"pypi": pypi_source, "npm": npm_source})
     top_package_reference = dependency_manager.trusted_packages_source(source, maybe_cache_handler)
-    trusted_packages = TrustedPackages(
+    trusted_packages = dependency_manager.trusted_packages_manager(
         names=top_package_reference.get_packages(),
         algorithm=EditDistance(),
         selector=selector_method,

@@ -18,10 +18,7 @@ class CacheEntry(BaseModel):
     """ISO format date string when the cache entry was saved."""
 
     packages: set[str]
-    """Set of trusted package names."""
-
-    namespaces: dict[str, list[str]] | None = None
-    """Dictionary containing all the namespaces and the packages."""
+    """Set of all trusted package names including full namespaced packages like @scope/package."""
 
     @field_validator("saved_date")
     @classmethod

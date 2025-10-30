@@ -183,6 +183,31 @@ class TestCheckDependencies:
             ]
         )
 
+    @patch("twyn.trusted_packages.TopNpmReference.get_packages")
+    def test_check_dependencies_detects_namespace_typosquats_from_file(
+        self, mock_get_packages: Mock, package_lock_json_file_with_namespace_typo: Path
+    ) -> None:
+        """Check that both namespace and regular package typosquats are detected when reading dependencies from file."""
+        mock_get_packages.return_value = {"@aws/sdk", "lodash"}
+
+        error = check_dependencies(
+            dependency_files={str(package_lock_json_file_with_namespace_typo)},
+            use_cache=False,
+        )
+
+        assert mock_get_packages.call_count == 1
+        assert error == TyposquatCheckResults(
+            results=[
+                TyposquatCheckResultFromSource(
+                    errors=[
+                        TyposquatCheckResultEntry(dependency="lodas", similars=["lodash"]),
+                        TyposquatCheckResultEntry(dependency="@awz/sdk", similars=["@aws/sdk"]),
+                    ],
+                    source=str(package_lock_json_file_with_namespace_typo),
+                )
+            ]
+        )
+
     @patch("twyn.trusted_packages.TopPyPiReference.get_packages")
     @patch("twyn.main._get_config")
     @patch("twyn.dependency_parser.parsers.abstract_parser.Path")
@@ -259,7 +284,7 @@ class TestCheckDependencies:
     def test_check_dependencies_with_input_from_cli_detects_typosquats(
         self, mock_get_packages_from_cache: Mock
     ) -> None:
-        mock_get_packages_from_cache.return_value = ({"mypackage"}, None)
+        mock_get_packages_from_cache.return_value = {"mypackage"}
         error = check_dependencies(
             dependencies={"my-package"},
             package_ecosystem="pypi",
@@ -274,12 +299,40 @@ class TestCheckDependencies:
             ]
         )
 
+    @patch("twyn.trusted_packages.TopNpmReference._get_packages_from_cache_if_enabled")
+    def test_check_dependencies_with_input_from_cli_detects_typosquats_on_namespace_packages(
+        self, mock_get_packages_from_cache: Mock
+    ) -> None:
+        """Test that typosquats can be detected on npm packages with namespaces (@scope/package format)."""
+        mock_get_packages_from_cache.return_value = {"@aws/sdk", "@react/core", "lodash"}
+        error = check_dependencies(
+            dependencies={
+                "@awz/sdk",  # Typosquat of @aws/sdk
+                "@aws/zdk",  # Not a typo, since namespace is a trusted one
+                "@awz/zdk",  # Not a typo, even if namespace is similar to a trusted one, the package is not similiar to any known one.
+                "lodas",
+            },
+            package_ecosystem="npm",
+        )
+
+        assert error == TyposquatCheckResults(
+            results=[
+                TyposquatCheckResultFromSource(
+                    errors=[
+                        TyposquatCheckResultEntry(dependency="lodas", similars=["lodash"]),
+                        TyposquatCheckResultEntry(dependency="@awz/sdk", similars=["@aws/sdk"]),
+                    ],
+                    source="manual_input",
+                )
+            ]
+        )
+
     @patch("twyn.trusted_packages.TopPyPiReference._get_packages_from_cache_if_enabled")
     def test_check_dependencies_recursive_and_dependency_file_set(
         self, mock_get_packages_from_cache: Mock, uv_lock_file_with_typo: Path
     ) -> None:
         """Test that recursive and dependency file can be set at the same time, and then dependency file takes precedence while recurisve is ignored."""
-        mock_get_packages_from_cache.return_value = ({"requests"}, None)
+        mock_get_packages_from_cache.return_value = {"requests"}
         error = check_dependencies(
             dependency_files={str(uv_lock_file_with_typo)},
             package_ecosystem="pypi",
@@ -298,7 +351,7 @@ class TestCheckDependencies:
     def test_check_dependencies_with_input_loads_file_from_different_location(
         self, mock_get_packages_from_cache: Mock, tmp_path: Path
     ) -> None:
-        mock_get_packages_from_cache.return_value = ({"mypackage"}, None)
+        mock_get_packages_from_cache.return_value = {"mypackage"}
         tmp_file = tmp_path / "fake-dir" / "requirements.txt"
         with create_tmp_file(tmp_file, "mypackag"):
             error = check_dependencies(
@@ -321,7 +374,7 @@ class TestCheckDependencies:
     def test_check_dependencies_with_multiple_dependency_files(
         self, mock_get_packages_from_cache: Mock, tmp_path: Path, uv_lock_file_with_typo: Path
     ) -> None:
-        mock_get_packages_from_cache.return_value = ({"requests"}, None)
+        mock_get_packages_from_cache.return_value = {"requests"}
         tmp_file = tmp_path / "fake-dir" / "requirements.txt"
         with create_tmp_file(tmp_file, "reqests"):
             error = check_dependencies(
@@ -347,7 +400,7 @@ class TestCheckDependencies:
     def test_check_dependencies_with_input_from_cli_accepts_multiple_dependencies(
         self, mock_get_packages_from_cache: Mock
     ) -> None:
-        mock_get_packages_from_cache.return_value = ({"requests", "mypackage"}, None)
+        mock_get_packages_from_cache.return_value = {"requests", "mypackage"}
 
         error = check_dependencies(
             config_file=None,
@@ -378,7 +431,7 @@ class TestCheckDependencies:
 
     @patch("twyn.trusted_packages.TopPyPiReference._get_packages_from_cache_if_enabled")
     def test_check_dependencies_with_input_from_cli_no_results(self, mock_get_packages_from_cache: Mock) -> None:
-        mock_get_packages_from_cache.return_value = ({"requests"}, None)
+        mock_get_packages_from_cache.return_value = {"requests"}
 
         error = check_dependencies(
             config_file=None,
@@ -394,7 +447,7 @@ class TestCheckDependencies:
     def test_error_when_show_progress_bar_and_dependencies_not_installed(
         self, mock_get_packages_from_cache: Mock
     ) -> None:
-        mock_get_packages_from_cache.return_value = ({"requests"}, None)
+        mock_get_packages_from_cache.return_value = {"requests"}
         sys.modules.pop("rich.progress", None)
         sys.modules.pop("rich", None)
 
@@ -413,7 +466,7 @@ class TestCheckDependencies:
     ) -> None:
         mock_exc.side_effect = Exception()
 
-        mock_get_packages_from_cache.return_value = ({"requests"}, None)
+        mock_get_packages_from_cache.return_value = {"requests"}
         sys.modules.pop("rich.progress", None)
         sys.modules.pop("rich", None)
 

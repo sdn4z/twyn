@@ -66,7 +66,7 @@ class AbstractPackageReference:
 
     @staticmethod
     @abstractmethod
-    def normalize_packages(packages: set[str], namespaces: dict[str, list[str]] | None = None) -> NormalizedPackages:
+    def normalize_packages(packages: set[str]) -> NormalizedPackages:
         """Normalize package names to make sure they're valid within the package manager context."""
 
     def _download(self) -> dict[str, Any]:
@@ -79,30 +79,28 @@ class AbstractPackageReference:
         except requests.exceptions.JSONDecodeError as err:
             raise InvalidJSONError from err
 
-    def _save_trusted_packages_to_cache_if_enabled(
-        self, packages: set[str], namespaces: dict[str, list[str]] | None = None
-    ) -> None:
+    def _save_trusted_packages_to_cache_if_enabled(self, packages: set[str]) -> None:
         """Save trusted packages using CacheHandler."""
         if not self.cache_handler:
             return
-        cache_entry = CacheEntry(saved_date=datetime.now().date().isoformat(), packages=packages, namespaces=namespaces)
+        cache_entry = CacheEntry(saved_date=datetime.now().date().isoformat(), packages=packages)
         self.cache_handler.write_entry(self.source, cache_entry)
         logger.debug("Saved %d trusted packages for source %s", len(packages), self.source)
 
-    def _get_packages_from_cache_if_enabled(self) -> tuple[set[str], dict[str, list[str]] | None]:
-        """Get packages and namespaces from cache if it's present and up to date."""
+    def _get_packages_from_cache_if_enabled(self) -> set[str]:
+        """Get packages from cache if it's present and up to date."""
         if not self.cache_handler:
-            return set(), None
+            return set()
         cache_entry = self.cache_handler.get_cache_entry(self.source)
         if not cache_entry:
             logger.debug("No cache entry found for source: %s", self.source)
-            return set(), None
+            return set()
 
-        return cache_entry.packages, cache_entry.namespaces
+        return cache_entry.packages
 
     def get_packages(self) -> NormalizedPackages:
         """Download and parse online source of top packages from the package ecosystem."""
-        packages, namespaces = self._get_packages_from_cache_if_enabled()
+        packages = self._get_packages_from_cache_if_enabled()
         # we don't save the cache here, we keep it as it is so the date remains the original one.
         if not packages:
             # no cache usage, no cache hit (non-existent or outdated) or cache was empty.
@@ -117,17 +115,7 @@ class AbstractPackageReference:
             if not packages:
                 raise EmptyPackagesListError
 
-            # Normalize packages to extract namespaces for caching
-            normalized = self.normalize_packages(packages)
-
-            # Convert namespaces from sets to lists for JSON serialization
-            namespaces_for_cache = {}
-            if normalized.namespaces:
-                namespaces_for_cache = {ns: sorted(pkgs) for ns, pkgs in normalized.namespaces.items()}
-
             # New packages were downloaded, we create a new entry updating all values.
-            self._save_trusted_packages_to_cache_if_enabled(packages, namespaces_for_cache)
+            self._save_trusted_packages_to_cache_if_enabled(packages)
 
-            return normalized
-
-        return self.normalize_packages(packages, namespaces)
+        return self.normalize_packages(packages)
